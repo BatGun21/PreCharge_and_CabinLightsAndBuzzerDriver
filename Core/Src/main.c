@@ -34,7 +34,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 #define R_PRECHARGE 250 // in ohms
 #define C_PRECHARGE 1000e-3 // in farads
 #define RC_TIME_CONSTANT (R_PRECHARGE * C_PRECHARGE)// in ms
@@ -101,10 +100,8 @@ int current = 0;
 int V_threshold = 0;
 float avg_v_supply = 0;
 float avg_V_in = 0;
-
 float V_supply_arr [Number_of_Samples] = {0.0};
 float V_in_arr [Number_of_Samples] = {0.0};
-
 char supplyError [50] = "Critical: Supply is out of Range ";
 char noiseError [50] = "Noise error / Check Connection ";
 char timeOut[50] = "7RC timeout has reached";
@@ -163,6 +160,9 @@ int Check_Motor_Drive_Signal(void);
 int Check_Cab_On_Door_Signal(void);
 void BuzzerDriver(void);
 void CabinLights_and_BuzzerDriver(void);
+void SetWaitOneMilliSec(void);
+void SetWaitThreeMilliSec(void);
+void SetWaitTwoMilliSec(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -177,6 +177,9 @@ struct Wait Three_RC = {0,3*RC_TIME_CONSTANT,0};
 struct Wait Seven_RC = {0,7*RC_TIME_CONSTANT,0};
 struct Wait OneSec = {0, 1000, 0};
 struct Wait TwoSec = {0, 2000, 0};
+struct Wait OneMilliSec = {0,1,0};
+struct Wait TwoMilliSec = {0,2,0};
+struct Wait ThreeMilliSec = {0,3,0};
 /* USER CODE END 0 */
 
 /**
@@ -392,6 +395,27 @@ void SetWaitTwoSec(void){//Debug
 	  }
 }
 
+void SetWaitOneMilliSec(void){
+	  if (!OneMilliSec.activeFlag){
+		  OneMilliSec.currentTime = counter;
+		  OneMilliSec.activeFlag = 1;
+	  }
+}
+
+void SetWaitTwoMilliSec(void){
+	  if (!TwoMilliSec.activeFlag){
+		  TwoMilliSec.currentTime = counter;
+		  TwoMilliSec.activeFlag = 1;
+	  }
+}
+
+void SetWaitThreeMilliSec(void){
+	  if (!ThreeMilliSec.activeFlag){
+		  ThreeMilliSec.currentTime = counter;
+		  ThreeMilliSec.activeFlag = 1;
+	  }
+}
+
 void SetWaitOneSec(void){
 	  if (!OneSec.activeFlag){
 		  OneSec.currentTime = counter;
@@ -424,17 +448,25 @@ uint16_t debounceSwitch(uint16_t pin){
 	uint16_t currPin = 0;
 	uint16_t temp = 0;
 	temp = pin;
-	DelayMSW(1);
-	if (pin==temp){
-		DelayMSW(1);
+	SetWaitOneMilliSec();
+	SetWaitTwoMilliSec();
+	SetWaitThreeMilliSec();
+	if(time_expired(OneMilliSec.delayTime, OneMilliSec.currentTime)){
+		OneMilliSec.activeFlag = 0;
 		if (pin==temp){
-			DelayMSW(1);
-			if (pin==temp){
-				currPin = temp;
+			if (time_expired(TwoMilliSec.delayTime, TwoMilliSec.currentTime)){
+				TwoMilliSec.activeFlag = 0;
+				if (pin==temp){
+					if (time_expired(ThreeMilliSec.delayTime, ThreeMilliSec.currentTime)){
+						ThreeMilliSec.activeFlag = 0;
+						currPin = temp;
+					}
+				}
 			}
+
+		}else{
+			currPin = pin;
 		}
-	}else{
-		currPin = pin;
 	}
 	return currPin;
 }
@@ -859,9 +891,9 @@ void ConfigureInputPins(void){
     GPIOB->MODER &= ~(GPIO_MODER_MODER6 | GPIO_MODER_MODER8); // Clear bits
     GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR6_0 | GPIO_PUPDR_PUPDR8_0); // Set pull-up
 
-    // Configure PB7  as digital input with internal pull-down for Motor Drive Input
+    // Configure PB7  as digital input with internal pull-up for Motor Drive Input
     GPIOB->MODER &= ~GPIO_MODER_MODER7; // Clear bits
-    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR7_1 ; // Set pull-down
+    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR7_0 ; // Set pull-up
 }
 
 int Check_Front_Door_Switches(void){
@@ -914,9 +946,9 @@ int Check_Dickey_Door_Switch(void){
 
 int Check_Motor_Drive_Signal(void){
 	if (((GPIO_PORT_MOTORDRIVE->IDR & GPIO_PIN_MOTORDRIVE_SIGNAL) != 0)){
-		return 1;
-	}else{
 		return 0;
+	}else{
+		return 1;
 	}
 }
 
