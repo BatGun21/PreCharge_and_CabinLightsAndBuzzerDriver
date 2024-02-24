@@ -140,10 +140,6 @@ int time_expired (int delayTime, int currentTime);
 uint16_t debounceSwitch(uint16_t pin);
 void PreChargeRelayCTRL(int state);
 void ContactorRelayCTRL(int state);
-void SetWaitOneSec(void);
-void SetWait3RC(void);
-void SetWait7RC(void);
-void SetWaitTwoSec(void);
 int VoltageInRange(float Vin);
 int PreChargeRelayIsON(void);
 void FrontLightRelayCTRL(int state);
@@ -160,9 +156,8 @@ int Check_Motor_Drive_Signal(void);
 int Check_Cab_On_Door_Signal(void);
 void BuzzerDriver(void);
 void CabinLights_and_BuzzerDriver(void);
-void SetWaitOneMilliSec(void);
-void SetWaitThreeMilliSec(void);
-void SetWaitTwoMilliSec(void);
+void SetWait (struct Wait *WaitTime);
+void ResetWait (struct Wait *WaitTime);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -177,9 +172,11 @@ struct Wait Three_RC = {0,3*RC_TIME_CONSTANT,0};
 struct Wait Seven_RC = {0,7*RC_TIME_CONSTANT,0};
 struct Wait OneSec = {0, 1000, 0};
 struct Wait TwoSec = {0, 2000, 0};
+
 struct Wait OneMilliSec = {0,1,0};
 struct Wait TwoMilliSec = {0,2,0};
 struct Wait ThreeMilliSec = {0,3,0};
+
 /* USER CODE END 0 */
 
 /**
@@ -340,7 +337,8 @@ static void MX_GPIO_Init(void)
 
 void killSwitch_Handler(void){
 	  uint16_t pin = 0;
-	  pin  = debounceSwitch(GPIO_PORT_SWITCH->IDR & KillSwitch_PIN);
+	  uint16_t killPin = GPIO_PORT_SWITCH->IDR & KillSwitch_PIN;
+	  pin  = debounceSwitch(killPin);
 	  if (pin!=0){
 		  //Turn of all Relays
 		  PreChargeRelayCTRL(OFF);
@@ -351,10 +349,10 @@ void killSwitch_Handler(void){
 		  BuzzerCTRL(OFF);
 		  while(1){
 			//Halt Operation
-			  SetWaitOneSec();
+			  SetWait(&OneSec);
 			  if (time_expired(OneSec.delayTime, OneSec.currentTime)){
 				  GPIO_PORT_LEDS->ODR ^= GPIO_RED_LED_PIN; //Error Blink
-				  OneSec.activeFlag = 0;
+				  ResetWait(&OneSec);
 			  }
 		  }
 	  }
@@ -388,53 +386,15 @@ void CabinLights_and_BuzzerDriver(void){
 	  }
 }
 
-void SetWaitTwoSec(void){//Debug
-	  if (!TwoSec.activeFlag){
-		  TwoSec.currentTime = counter;
-		  TwoSec.activeFlag = 1;
+void SetWait (struct Wait *WaitTime){
+	  if (!(WaitTime->activeFlag)){
+		  WaitTime->currentTime = counter;
+		  WaitTime->activeFlag = 1;
 	  }
 }
 
-void SetWaitOneMilliSec(void){
-	  if (!OneMilliSec.activeFlag){
-		  OneMilliSec.currentTime = counter;
-		  OneMilliSec.activeFlag = 1;
-	  }
-}
-
-void SetWaitTwoMilliSec(void){
-	  if (!TwoMilliSec.activeFlag){
-		  TwoMilliSec.currentTime = counter;
-		  TwoMilliSec.activeFlag = 1;
-	  }
-}
-
-void SetWaitThreeMilliSec(void){
-	  if (!ThreeMilliSec.activeFlag){
-		  ThreeMilliSec.currentTime = counter;
-		  ThreeMilliSec.activeFlag = 1;
-	  }
-}
-
-void SetWaitOneSec(void){
-	  if (!OneSec.activeFlag){
-		  OneSec.currentTime = counter;
-		  OneSec.activeFlag = 1;
-	  }
-}
-
-void SetWait3RC(void){
-	if (!Three_RC.activeFlag){
-		Three_RC.currentTime = counter;
-		Three_RC.activeFlag = 1;
-	}
-}
-
-void SetWait7RC(void){
-	if (!Seven_RC.activeFlag){
-		Seven_RC.currentTime = counter;
-		Seven_RC.activeFlag = 1;
-	}
+void ResetWait (struct Wait *WaitTime){
+	WaitTime->activeFlag = 0;
 }
 
 void EXTI0_1_IRQHandler(void) {
