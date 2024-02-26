@@ -109,6 +109,12 @@ char killSwitch[50] =  "kill switch was pressed";
 volatile uint32_t debounceTimer = 0;
 int killSwitchFlagRE = 0;
 int relaystate = 0;
+struct Wait {
+	int currentTime;
+	int delayTime ;
+	int activeFlag;
+};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -136,8 +142,8 @@ float Avg_V_in (void);
 float Avg_V_Supply (void);
 void EXTI_Init(void);
 void supplySenseLoop (void);
-int time_expired (int delayTime, int currentTime);
-uint16_t debounceSwitch(uint16_t pin);
+int time_expired (struct Wait *WaitTime);
+uint16_t debounceSwitch(uint16_t pin, struct Wait *WaitTimeOneMilli, struct Wait *WaitTimeTwoMilli, struct Wait *WaitTimeThreeMilli);
 void PreChargeRelayCTRL(int state);
 void ContactorRelayCTRL(int state);
 int VoltageInRange(float Vin);
@@ -162,20 +168,35 @@ void ResetWait (struct Wait *WaitTime);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-struct Wait {
-	int currentTime;
-	int delayTime ;
-	int activeFlag;
-};
 
 struct Wait Three_RC = {0,3*RC_TIME_CONSTANT,0};
 struct Wait Seven_RC = {0,7*RC_TIME_CONSTANT,0};
 struct Wait OneSec = {0, 1000, 0};
 struct Wait TwoSec = {0, 2000, 0};
 
-struct Wait OneMilliSec = {0,1,0};
-struct Wait TwoMilliSec = {0,2,0};
-struct Wait ThreeMilliSec = {0,3,0};
+struct Wait killSWDebounceOneMilliSec = {0,1,0};
+struct Wait killSWDebounceTwoMilliSec = {0,2,0};
+struct Wait killSWDebounceThreeMilliSec = {0,3,0};
+
+struct Wait FrontRightSWDebounceOneMilliSec = {0,1,0};
+struct Wait FrontRightSWDebounceTwoMilliSec = {0,2,0};
+struct Wait FrontRightSWDebounceThreeMilliSec = {0,3,0};
+
+struct Wait FrontLeftSWDebounceOneMilliSec = {0,1,0};
+struct Wait FrontLeftSWDebounceTwoMilliSec = {0,2,0};
+struct Wait FrontLeftSWDebounceThreeMilliSec = {0,3,0};
+
+struct Wait RearRightSWDebounceOneMilliSec = {0,1,0};
+struct Wait RearRightSWDebounceTwoMilliSec = {0,2,0};
+struct Wait RearRightSWDebounceThreeMilliSec = {0,3,0};
+
+struct Wait RearLeftSWDebounceOneMilliSec = {0,1,0};
+struct Wait RearLeftSWDebounceTwoMilliSec = {0,2,0};
+struct Wait RearLeftSWDebounceThreeMilliSec = {0,3,0};
+
+struct Wait DickeySWDebounceOneMilliSec = {0,1,0};
+struct Wait DickeySWDebounceTwoMilliSec = {0,2,0};
+struct Wait DickeySWDebounceThreeMilliSec = {0,3,0};
 
 /* USER CODE END 0 */
 
@@ -338,7 +359,7 @@ static void MX_GPIO_Init(void)
 void killSwitch_Handler(void){
 	  uint16_t pin = 0;
 	  uint16_t killPin = GPIO_PORT_SWITCH->IDR & KillSwitch_PIN;
-	  pin  = debounceSwitch(killPin);
+	  pin  = debounceSwitch(killPin, &killSWDebounceOneMilliSec, &killSWDebounceTwoMilliSec, &killSWDebounceThreeMilliSec);
 	  if (pin!=0){
 		  //Turn of all Relays
 		  PreChargeRelayCTRL(OFF);
@@ -350,7 +371,7 @@ void killSwitch_Handler(void){
 		  while(1){
 			//Halt Operation
 			  SetWait(&OneSec);
-			  if (time_expired(OneSec.delayTime, OneSec.currentTime)){
+			  if (time_expired(&OneSec)){
 				  GPIO_PORT_LEDS->ODR ^= GPIO_RED_LED_PIN; //Error Blink
 				  ResetWait(&OneSec);
 			  }
@@ -393,8 +414,8 @@ void SetWait (struct Wait *WaitTime){
 	  }
 }
 
-void ResetWait (struct Wait *WaitTime){
-	WaitTime->activeFlag = 0;
+void ResetWait (struct Wait *WaitTime1){
+	WaitTime1->activeFlag = 0;
 }
 
 void EXTI0_1_IRQHandler(void) {
@@ -404,21 +425,24 @@ void EXTI0_1_IRQHandler(void) {
     EXTI->PR = EXTI_PR_PR0; // Clear the interrupt pending bit by writing '1' to it
 }
 
-uint16_t debounceSwitch(uint16_t pin){
+uint16_t debounceSwitch(uint16_t pin, struct Wait *WaitTimeOneMilli, struct Wait *WaitTimeTwoMilli, struct Wait *WaitTimeThreeMilli){
+
 	uint16_t currPin = 0;
 	uint16_t temp = 0;
 	temp = pin;
-	SetWaitOneMilliSec();
-	SetWaitTwoMilliSec();
-	SetWaitThreeMilliSec();
-	if(time_expired(OneMilliSec.delayTime, OneMilliSec.currentTime)){
-		OneMilliSec.activeFlag = 0;
+
+	SetWait(WaitTimeOneMilli);
+	SetWait(WaitTimeTwoMilli);
+	SetWait(WaitTimeThreeMilli);
+
+	if(time_expired(WaitTimeOneMilli)){
+		ResetWait(WaitTimeOneMilli);
 		if (pin==temp){
-			if (time_expired(TwoMilliSec.delayTime, TwoMilliSec.currentTime)){
-				TwoMilliSec.activeFlag = 0;
+			if (time_expired(WaitTimeTwoMilli)){
+				ResetWait(WaitTimeTwoMilli);
 				if (pin==temp){
-					if (time_expired(ThreeMilliSec.delayTime, ThreeMilliSec.currentTime)){
-						ThreeMilliSec.activeFlag = 0;
+					if (time_expired(WaitTimeThreeMilli)){
+						ResetWait(WaitTimeThreeMilli);
 						currPin = temp;
 					}
 				}
@@ -428,6 +452,7 @@ uint16_t debounceSwitch(uint16_t pin){
 			currPin = pin;
 		}
 	}
+
 	return currPin;
 }
 
@@ -497,11 +522,11 @@ void sense_V_supply(void){
 			V_supply_arr[i] = V_supply;
 			i++;
 		}else{
-			SetWaitOneSec();
-			if (time_expired(OneSec.delayTime, OneSec.currentTime)){
+			SetWait(&OneSec);
+			if (time_expired(&OneSec)){
 				HAL_UART_Transmit(&huart2, (uint8_t*)supplyError, strlen(supplyError), 100); //supply out of range
 				Voltage_Print();
-				OneSec.activeFlag = 0;
+				ResetWait(&OneSec);
 			}
 		}
 	}
@@ -521,12 +546,11 @@ void sense_V_in(void){
 
 		}else{
 			V_in_arr[i] = V_in;
-			SetWaitOneSec();
-			if (time_expired(OneSec.delayTime, OneSec.currentTime)){
+			SetWait(&OneSec);
+			if (time_expired(&OneSec)){
 				HAL_UART_Transmit(&huart2, (uint8_t*)noiseError, strlen(noiseError), 100); //For Noise
 				Voltage_Print();
-				OneSec.activeFlag = 0;
-			}
+				SetWait(&OneSec);			}
 		}
 		i++;
 
@@ -547,9 +571,9 @@ void LED_init(void){
 	  GPIOC->MODER |= GPIO_MODER_MODER6_0|GPIO_MODER_MODER7_0|GPIO_MODER_MODER8_0|GPIO_MODER_MODER9_0;
 }
 
-int time_expired (int delayTime, int currentTime){
+int time_expired (struct Wait *WaitTime){
 	int timeExpiredFlag = 0;
-	if (counter> currentTime+delayTime){
+	if (counter> (WaitTime->currentTime) + (WaitTime->delayTime)){
 		timeExpiredFlag = 1;
 	}else{
 		timeExpiredFlag = 0;
@@ -559,10 +583,10 @@ int time_expired (int delayTime, int currentTime){
 
 void Precharge(void) {
 
-	SetWait3RC();
-	SetWait7RC();
+	SetWait(&Three_RC);
+	SetWait(&Seven_RC);
 
-	if (time_expired(Three_RC.delayTime, Three_RC.currentTime)){
+	if (time_expired(&Three_RC)){
 
 		sense_V_in();
 		avg_V_in = Avg_and_remove_outliers_V_in();
@@ -574,9 +598,9 @@ void Precharge(void) {
 	        GPIO_PORT_LEDS->ODR &= ~GPIO_BLUE_LED_PIN;
 
 
-	        if (time_expired(Seven_RC.delayTime, Seven_RC.currentTime)){
+	        if (time_expired(&Seven_RC)){
 
-	        	Seven_RC.activeFlag = 0;
+	        	ResetWait(&Seven_RC);
 	        	PreChargeRelayCTRL(OFF);
 	        }
 
@@ -587,7 +611,7 @@ void Precharge(void) {
 	        GPIO_PORT_LEDS->ODR &= ~GPIO_RED_LED_PIN;
 
 	    }
-	    Three_RC.activeFlag = 0;
+	    ResetWait(&Three_RC);
 	}
 }
 
@@ -862,8 +886,8 @@ int Check_Front_Door_Switches(void){
     int frontRightSwitch = GPIO_PORT_DOORSWITCHES->IDR & GPIO_PIN_CAB_DOOR_SW_FRNT_R;
 
     if (frontLeftSwitch == 0 || frontRightSwitch == 0) {
-        int frontLeftDebounced = debounceSwitch(frontLeftSwitch);
-        int frontRightDebounced = debounceSwitch(frontRightSwitch);
+        int frontLeftDebounced = debounceSwitch(frontLeftSwitch, &FrontLeftSWDebounceOneMilliSec, &FrontLeftSWDebounceTwoMilliSec, &FrontLeftSWDebounceThreeMilliSec);
+        int frontRightDebounced = debounceSwitch(frontRightSwitch, &FrontRightSWDebounceOneMilliSec, &FrontRightSWDebounceTwoMilliSec, &FrontLeftSWDebounceThreeMilliSec);
 
         if (frontLeftDebounced == 0 || frontRightDebounced == 0) {
             state = 1;
@@ -879,14 +903,13 @@ int Check_Rear_Door_Switches(void){
     int rearRightSwitch = GPIO_PORT_DOORSWITCHES->IDR & GPIO_PIN_CAB_DOOR_SW_REAR_R;
 
     if (rearLeftSwitch == 0 || rearRightSwitch == 0) {
-        int rearLeftDebounced = debounceSwitch(rearLeftSwitch);
-        int rearRightDebounced = debounceSwitch(rearRightSwitch);
+        int rearLeftDebounced = debounceSwitch(rearLeftSwitch, &RearLeftSWDebounceOneMilliSec, &RearLeftSWDebounceTwoMilliSec, &RearLeftSWDebounceThreeMilliSec);
+        int rearRightDebounced = debounceSwitch(rearRightSwitch, &RearRightSWDebounceOneMilliSec, &RearRightSWDebounceTwoMilliSec, &RearRightSWDebounceThreeMilliSec);
 
         if (rearLeftDebounced == 0 || rearRightDebounced == 0) {
             state = 1;
         }
     }
-
     return state;
 }
 
@@ -895,12 +918,11 @@ int Check_Dickey_Door_Switch(void){
     int dickeySwitch = GPIO_PORT_DICKEYSWITCH->IDR & GPIO_PIN_CAB_DOOR_SW_DICKEY;
 
     if (dickeySwitch == 0) {
-        int dickeyDebounced = debounceSwitch(dickeySwitch);
+        int dickeyDebounced = debounceSwitch(dickeySwitch, &DickeySWDebounceOneMilliSec, &DickeySWDebounceTwoMilliSec, &DickeySWDebounceThreeMilliSec);
         if (dickeyDebounced == 0) {
             state = 1;
         }
     }
-
     return state;
 }
 
