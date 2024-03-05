@@ -404,6 +404,10 @@ void CabinLights_and_BuzzerDriver(void){
 		  }else{
 			  DickeyLightRelayCTRL(OFF);
 		  }
+	  }else{
+		  FrontLightRelayCTRL(OFF);
+		  BackLightRelayCTRL(OFF);
+		  DickeyLightRelayCTRL(OFF);
 	  }
 }
 
