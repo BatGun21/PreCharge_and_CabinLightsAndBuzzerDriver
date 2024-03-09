@@ -383,6 +383,8 @@ void CabinLights_and_BuzzerDriver(void){
 
 	  if(Check_Motor_Drive_Signal()){
 		  BuzzerDriver();
+	  }else{
+		  BuzzerCTRL(OFF);
 	  }
 
 	  if(Check_Cab_On_Door_Signal()){
