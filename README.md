@@ -99,16 +99,3 @@ This project involves the implementation of a precharge control system for a 48V
 - **system_stm32f0xx.c**
   - System initialization and configuration.
 
-## Test Mode
-
-### Enabling Test Mode
-
-- Define `#define TEST_MODE` in `main.c` to enable test mode.
-
-### Simulate Scenarios
-
-- The test mode simulates various scenarios and outputs the results over UART. Scenarios include:
-  - Normal Operation
-  - Precharge Timeout
-  - Supply Voltage Out of Range
-  - Kill Switch Pressed
